@@ -38,7 +38,7 @@ class ULA:
         return ret
 
     def get_beam_pattern(self, theta: float = 0, n_theta: int = 256) -> tuple[np.array, np.array]:
-        angle_bins = self.get_angle_bins(n_theta)
+        angle_bins = self.get_angle_bins_full(n_theta)
         pdss = np.pi * self.d * (np.sin(angle_bins) - np.sin(theta))
         p = np.sin(self.nr * pdss) / np.sin(pdss) / self.nr
 
@@ -53,10 +53,14 @@ class ULA:
         return ret
 
     @staticmethod
-    def get_beam_pattern_fft(coefficient: np.array = 0, fft_size: int = 256) -> tuple[np.array, np.array]:
+    def get_angle_bins_full(fft_size: int = 256):
+        ret = np.arange(-np.pi/2, np.pi/2, np.pi / fft_size)
+        return ret
+
+    def get_beam_pattern_fft(self, coefficient: np.array = 0, fft_size: int = 256) -> tuple[np.array, np.array]:
         C = np.fft.fftshift(np.fft.fft(coefficient, fft_size))
         C_dB = 20*np.log10(np.abs(C))
         C_dB -= np.max(C_dB)
 
-        angle_bins = ULA.get_angle_bins(fft_size)
+        angle_bins = self.get_angle_bins(self.d, fft_size)
         return C_dB, angle_bins
