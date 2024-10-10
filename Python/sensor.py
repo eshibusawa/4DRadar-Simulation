@@ -68,6 +68,9 @@ class ULA:
 
 class MIMOVirtualArray:
     def __init__(self, mc: MIMOConfiguration):
+        # (0) setup
+        self.use_conjugate = False # apply complex conjugate for obtaining signals
+
         # (1) check array structure
         va_arr = np.array(mc.va, dtype=np.int32)
         # (1.1) check element coordinate
@@ -135,6 +138,8 @@ class MIMOVirtualArray:
         else:
             ret = np.reshape(X, (X.shape[0] * X.shape[1], *X.shape[2:]))
         ret = np.squeeze(ret)
+        if self.use_conjugate:
+            ret = np.conj(ret)
         return ret
 
     def get_signal_padded(self, X: np.array) -> np.array:
@@ -145,4 +150,6 @@ class MIMOVirtualArray:
             ret = np.zeros((*self.va_mask.shape, *X.shape[2:]), dtype=X.dtype)
             ret[self.index_mat[0], self.index_mat[1]] = np.reshape(X, (X.shape[0] * X.shape[1], *X.shape[2:]))
         ret = np.squeeze(ret)
+        if self.use_conjugate:
+            ret = np.conj(ret)
         return ret

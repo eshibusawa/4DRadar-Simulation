@@ -66,11 +66,11 @@ class TargetObject:
     def __init__(self, r: float, rvel: float, angle: float):
         ar = np.deg2rad(angle)
         loc = np.empty((3, 1), dtype=np.float64)
-        loc[0] = -r * np.sin(ar)
+        loc[0] = r * np.sin(ar)
         loc[1] = r * np.cos(ar)
         loc[2] = 0
         vel = np.empty_like(loc)
-        vel[0] = -rvel * np.sin(ar)
+        vel[0] = rvel * np.sin(ar)
         vel[1] = rvel * np.cos(ar)
         vel[2] = 0
 
