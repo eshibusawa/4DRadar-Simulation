@@ -23,6 +23,7 @@
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import numpy as np
+from radar_simulation import MIMOConfiguration
 
 class ULA:
     def __init__(self, nr: int, d: float) -> None:
@@ -64,3 +65,84 @@ class ULA:
 
         angle_bins = self.get_angle_bins(self.d, fft_size)
         return C_dB, angle_bins
+
+class MIMOVirtualArray:
+    def __init__(self, mc: MIMOConfiguration):
+        # (1) check array structure
+        va_arr = np.array(mc.va, dtype=np.int32)
+        # (1.1) check element coordinate
+        has_neg = np.min(va_arr)
+        has_z = np.any(va_arr[:,:,2])
+        is_supported = (not has_neg) and (not has_z)
+        if not is_supported:
+            raise ValueError ('only x-linear array or xz-planer array')
+
+        # (1.2) compute mask
+        nx_max = np.max(va_arr[:,:,0])
+        ny_max = np.max(va_arr[:,:,1])
+        self.va_mask = np.zeros((ny_max + 1, nx_max + 1), dtype=np.int8)
+        has_y_axis = False
+        for k in range(va_arr.shape[0]):
+            for l in range(va_arr.shape[1]):
+                x = va_arr[k][l][0]
+                y = va_arr[k][l][1]
+                self.va_mask[y, x] = 1
+                if y != 0:
+                    has_y_axis = True
+
+        # (1.3) compute mask indices
+        self.is_uniform = self.va_mask.size == np.count_nonzero(self.va_mask)
+        index_full = self.get_full_index(self.va_mask.shape)
+        self.index_vec = index_full[self.va_mask == 1]
+        self.index_mat = np.unravel_index(self.index_vec, self.va_mask.shape)
+
+        if not has_y_axis:
+            type_str = 'uniform' if self.is_uniform else 'general'
+            print('the array seems {} linear array'.format(type_str))
+            self.array_dimension = 1
+            self.la = ULA(self.va_mask.shape[1], mc.d)
+            self.angle_bins_func = lambda angle_fft_size: self.la.get_angle_bins(mc.d, angle_fft_size)
+            self.steering_vector_matrix_func = lambda theta: self.la.get_steering_vector_matrix(theta)
+        else:
+            print('the array seems xz-planer array')
+            self.array_dimension = 2
+            raise ValueError ('is not implemented yet')
+
+    @staticmethod
+    def get_full_index(sz):
+        iy = np.arange(sz[0], dtype=np.int32)
+        ix = np.arange(sz[1], dtype=np.int32)
+        ret = np.zeros(sz, dtype=np.int32)
+        ret[:,:] = iy[:,None]
+        ret[:,:] = ix[None,:]
+        return ret
+
+    def get_array_dimension(self) -> int:
+        return self.array_dimension
+
+    def get_fft_angle_bins(self, angle_fft_size) -> np.array:
+        return self.angle_bins_func(angle_fft_size)
+
+    def get_steering_vector_matrix(self, theta) -> np.array:
+        ret = self.steering_vector_matrix_func(theta)
+        if not self.is_uniform:
+            ret = ret[self.index_vec, :]
+        return ret
+
+    def get_signal(self, X: np.array) -> np.array:
+        if len(X.shape) == 2:
+            ret = np.reshape(X, -1)
+        else:
+            ret = np.reshape(X, (X.shape[0] * X.shape[1], *X.shape[2:]))
+        ret = np.squeeze(ret)
+        return ret
+
+    def get_signal_padded(self, X: np.array) -> np.array:
+        if len(X.shape) == 2:
+            ret = np.zeros(self.va_mask.shape, dtype=X.dtype)
+            ret[self.index_mat[0], self.index_mat[1]] = np.reshape(X, -1)
+        else:
+            ret = np.zeros((*self.va_mask.shape, *X.shape[2:]), dtype=X.dtype)
+            ret[self.index_mat[0], self.index_mat[1]] = np.reshape(X, (X.shape[0] * X.shape[1], *X.shape[2:]))
+        ret = np.squeeze(ret)
+        return ret
