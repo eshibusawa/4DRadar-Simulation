@@ -48,13 +48,13 @@ class ULA:
         return p_dB, angle_bins
 
     @staticmethod
-    def get_angle_bins(d: float, fft_size: int = 256):
+    def get_angle_bins(d: float, fft_size: int = 256) -> np.array:
         radrange = np.arange(-np.pi, np.pi, 2 * np.pi / fft_size)
         ret = np.arcsin(radrange / 2 / np.pi / d)
         return ret
 
     @staticmethod
-    def get_angle_bins_full(fft_size: int = 256):
+    def get_angle_bins_full(fft_size: int = 256) -> np.array:
         ret = np.arange(-np.pi/2, np.pi/2, np.pi / fft_size)
         return ret
 
@@ -66,50 +66,109 @@ class ULA:
         angle_bins = self.get_angle_bins(self.d, fft_size)
         return C_dB, angle_bins
 
+class URA:
+    def __init__(self, nr: int, d: float) -> None:
+        self.nr = nr
+        self.d = d
+
+    def get_steering_vector(self, theta_phi: tuple[float, float] = (0, 0)) -> np.array:
+        theta, phi = theta_phi[0], theta_phi[1]
+        ret_el = np.exp(2j * np.pi * self.d * np.arange(self.nr[0]) * np.sin(theta))
+        ret_az = np.exp(2j * np.pi * self.d * np.arange(self.nr[1]) * np.sin(phi) * np.cos(theta))
+        ret = np.kron(ret_el, ret_az) # equal to ret_el[:,None] * ret_az[None, :]
+        return ret
+
+    def get_steering_vector_matrix(self, theta_phi: tuple[np.array, np.array]) -> np.array:
+        complex_type = np.complex64 if theta_phi[0].dtype == np.float32 else np.complex128
+        ret = np.zeros((self.nr[0] * self.nr[1], theta_phi[0].shape[0] * theta_phi[1].shape[0]), dtype=complex_type)
+        k = 0
+        for theta in theta_phi[0]:
+            for phi in theta_phi[1]:
+                ret[:,k] = self.get_steering_vector((theta, phi))
+                k += 1
+        return ret
+
+    def get_beam_pattern_fft(self, coefficient: np.array = 0, fft_size: int = 256) -> tuple[np.array, np.array]:
+        C = np.fft.fftshift(np.fft.fft2(coefficient, fft_size, axes=(-1, -2)), axes=(-1, -2))
+        C_dB = 20*np.log10(np.abs(C))
+        C_dB -= np.max(C_dB)
+
+        angle_bins = self.get_angle_bins(self.d, fft_size)
+        return C_dB, angle_bins
+
+    @staticmethod
+    def get_angle_bins(d: float, fft_size: int = 256) -> np.array:
+        radrange = np.arange(-np.pi, np.pi, 2 * np.pi / fft_size)
+        ret_el = np.arcsin(radrange / 2 / np.pi / d)
+        val_az = radrange[None,:] / 2 / np.pi / d / np.cos(ret_el[:,None])
+        mask = np.abs(val_az) <= 1
+        ret_az = np.full((fft_size, fft_size), np.pi, dtype=radrange.dtype) # np.pi is invalid value
+        ret_az[mask] = np.arcsin(val_az[mask])
+        return ret_el, ret_az
+
+    @staticmethod
+    def get_angle_bins_full(fft_size: int = 256) -> np.array:
+        return URA.get_angle_bins(d=0.5, fft_size=fft_size)
+
+    @staticmethod
+    def get_valid_angle_mask(angle_bins) -> np.array:
+        return np.abs(angle_bins) <= (np.pi / 2)
+
 class MIMOVirtualArray:
     def __init__(self, mc: MIMOConfiguration):
         # (0) setup
-        self.use_conjugate = False # apply complex conjugate for obtaining signals
+        self.valid_angle_mask_func = None
 
         # (1) check array structure
         va_arr = np.array(mc.va, dtype=np.int32)
         # (1.1) check element coordinate
         has_neg = np.min(va_arr)
-        has_z = np.any(va_arr[:,:,2])
-        is_supported = (not has_neg) and (not has_z)
+        has_y = np.any(va_arr[:,:,1])
+        is_supported = (not has_neg) and (not has_y)
         if not is_supported:
             raise ValueError ('only x-linear array or xz-planer array')
 
         # (1.2) compute mask
         nx_max = np.max(va_arr[:,:,0])
-        ny_max = np.max(va_arr[:,:,1])
-        self.va_mask = np.zeros((ny_max + 1, nx_max + 1), dtype=np.int8)
-        has_y_axis = False
+        nz_max = np.max(va_arr[:,:,2])
+        self.va_mask = np.zeros((nz_max + 1, nx_max + 1), dtype=np.int8)
+        has_z_axis = False
+        index_vec = list()
+        index_mat = list((list(), list()))
         for k in range(va_arr.shape[0]):
             for l in range(va_arr.shape[1]):
                 x = va_arr[k][l][0]
-                y = va_arr[k][l][1]
-                self.va_mask[y, x] = 1
-                if y != 0:
-                    has_y_axis = True
+                z = va_arr[k][l][2]
+                if self.va_mask[z, x] == 0:
+                    self.va_mask[z, x] = 1
+                    index_vec.append(k * va_arr.shape[1] + l)
+                    index_mat[0].append(z)
+                    index_mat[1].append(x)
+                if z != 0:
+                    has_z_axis = True
 
         # (1.3) compute mask indices
         self.is_uniform = self.va_mask.size == np.count_nonzero(self.va_mask)
-        index_full = self.get_full_index(self.va_mask.shape)
-        self.index_vec = index_full[self.va_mask == 1]
-        self.index_mat = np.unravel_index(self.index_vec, self.va_mask.shape)
+        self.index_vec = index_vec
+        self.index_mat = index_mat
 
-        if not has_y_axis:
+        if not has_z_axis:
             type_str = 'uniform' if self.is_uniform else 'general'
             print('the array seems {} linear array'.format(type_str))
             self.array_dimension = 1
             self.la = ULA(self.va_mask.shape[1], mc.d)
             self.angle_bins_func = lambda angle_fft_size: self.la.get_angle_bins(mc.d, angle_fft_size)
+            self.steering_vector_func = lambda theta: self.la.get_steering_vector(theta)
             self.steering_vector_matrix_func = lambda theta: self.la.get_steering_vector_matrix(theta)
         else:
-            print('the array seems xz-planer array')
+            type_str = 'xz uniform rectangular' if self.is_uniform else 'general xz planaer'
+            print('the array seems {} array'.format(type_str))
             self.array_dimension = 2
-            raise ValueError ('is not implemented yet')
+            self.pa = URA(self.va_mask.shape, mc.d)
+            self.angle_bins_func = lambda angle_fft_size: self.pa.get_angle_bins(mc.d, angle_fft_size)
+            self.steering_vector_func = lambda theta: self.pa.get_steering_vector(theta)
+            self.steering_vector_matrix_func = lambda theta: self.pa.get_steering_vector_matrix(theta)
+            self.valid_angle_mask_func = lambda theta: self.pa.get_valid_angle_mask(theta)
 
     @staticmethod
     def get_full_index(sz):
@@ -126,6 +185,15 @@ class MIMOVirtualArray:
     def get_fft_angle_bins(self, angle_fft_size) -> np.array:
         return self.angle_bins_func(angle_fft_size)
 
+    def get_valid_angle_mask(self, theta) -> np.array:
+        return self.valid_angle_mask_func(theta)
+
+    def get_steering_vector(self, theta) -> np.array:
+        ret = self.steering_vector_func(theta)
+        if not self.is_uniform:
+            ret = ret[self.index_vec, :]
+        return ret
+
     def get_steering_vector_matrix(self, theta) -> np.array:
         ret = self.steering_vector_matrix_func(theta)
         if not self.is_uniform:
@@ -134,22 +202,20 @@ class MIMOVirtualArray:
 
     def get_signal(self, X: np.array) -> np.array:
         if len(X.shape) == 2:
-            ret = np.reshape(X, -1)
+            vec_X = np.reshape(X, -1)
         else:
-            ret = np.reshape(X, (X.shape[0] * X.shape[1], *X.shape[2:]))
+            vec_X = np.reshape(X, (-1, *X.shape[2:]))
+        ret = vec_X[self.index_vec]
         ret = np.squeeze(ret)
-        if self.use_conjugate:
-            ret = np.conj(ret)
         return ret
 
     def get_signal_padded(self, X: np.array) -> np.array:
         if len(X.shape) == 2:
             ret = np.zeros(self.va_mask.shape, dtype=X.dtype)
-            ret[self.index_mat[0], self.index_mat[1]] = np.reshape(X, -1)
+            vec_X = np.reshape(X, -1)
         else:
             ret = np.zeros((*self.va_mask.shape, *X.shape[2:]), dtype=X.dtype)
-            ret[self.index_mat[0], self.index_mat[1]] = np.reshape(X, (X.shape[0] * X.shape[1], *X.shape[2:]))
+            vec_X = np.reshape(X, (-1, *X.shape[2:]))
+        ret[self.index_mat[0], self.index_mat[1]] = vec_X[self.index_vec]
         ret = np.squeeze(ret)
-        if self.use_conjugate:
-            ret = np.conj(ret)
         return ret

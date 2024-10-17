@@ -2,20 +2,12 @@ name: 4dradar-simulation
 channels:
   - conda-forge
 dependencies:
-  - cupy=12.*
-  - cudatoolkit=11.8*
   - ipython
   - jupyter
   - matplotlib
   - nbconvert
   - nose
-  - numba
   - pip
-  - plotly
-  - py-opencv
-  - pybind11
   - python=3.10.*
   - scipy
-  - pip:
-      - pyargus
 prefix: /path/to/your/envs/4dradar-simulation

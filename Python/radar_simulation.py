@@ -80,6 +80,27 @@ class TargetObject:
         self.loc = loc
         self.vel = vel
 
+    @staticmethod
+    def get_3d_target(r: float, rvel: float, angles: tuple[float, float]):
+        ret = TargetObject(0, 0, 0)
+        theta, phi = np.deg2rad(angles[0]), np.deg2rad(angles[1])
+        loc = np.empty((3, 1), dtype=np.float64)
+        loc[0] = r * np.cos(theta) * np.sin(phi)
+        loc[1] = r * np.cos(theta) * np.cos(phi)
+        loc[2] = r * np.sin(theta)
+        vel = np.empty_like(loc)
+        vel[0] = rvel * np.cos(theta) * np.sin(phi)
+        vel[1] = rvel * np.cos(theta) * np.cos(phi)
+        vel[2] = rvel * np.sin(theta)
+
+        ret.r = r
+        ret.rvel = rvel
+        ret.angle = angles
+        ret.loc = loc
+        ret.vel = vel
+
+        return ret
+
     def get_trajectries(self, ts:np.array) -> np.array:
         ret = self.loc + self.vel * (ts[None, :])
         return ret
@@ -98,13 +119,18 @@ class FMCWMIMORadar:
 
     def get_delay_(self, trajectory: np.array) -> np.array:
         ret = np.empty((self.mc.txl.shape[0], self.mc.rxl.shape[0], trajectory.shape[1]), dtype=trajectory.dtype)
+        tx_0 = self.mc.d_m * self.mc.txl[0][:,None]
+        outward = trajectory - tx_0
+        r0 = np.linalg.norm(outward, axis=0) # TX -> Target
+        tof0 = 2 * r0 / self.cc.speed_of_light; # TOF (TX -> Target -> RX) is approximated 2 * (TX -> Target)
+        sin_theta0 = outward[2,:] / r0
+        sin_phi0_cos_theta0 = outward[0,:] / r0
         for k in range(ret.shape[0]):
             tx_k = self.mc.d_m * self.mc.txl[k][:,None]
             for l in range(ret.shape[1]):
                 rx_l = self.mc.d_m * self.mc.rxl[l][:,None] + tx_k
-                delta1 = np.linalg.norm(trajectory - tx_k, axis=0) # TX -> Target
-                delta2 = np.linalg.norm(rx_l - trajectory, axis=0) # RX -> Target
-                ret[k, l, :] = (delta1 + delta2) / self.cc.speed_of_light; # TOF
+                tof_kl = (sin_theta0 * rx_l[2] + sin_phi0_cos_theta0 * rx_l[0]) / self.cc.speed_of_light
+                ret[k, l, :] = tof0 + tof_kl
         return ret
 
     def get_data_cube(self, num_frames: int, targets: list[TargetObject]) -> np.array:
@@ -122,7 +148,7 @@ class FMCWMIMORadar:
         phase0 = phase0[None, None, None, None, :]
 
         ts = self.get_timesteps_(num_frames)
-        tsf = ts.flatten()
+        tsf = np.reshape(ts, -1)
         t_complex = (np.exp(1j * ct[0])).dtype
         ret = np.zeros((num_tx, num_rx, num_frames, num_chirp, num_adc), dtype=t_complex)
         ct = ct[None, None, None, None, :]

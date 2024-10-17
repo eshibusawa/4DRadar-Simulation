@@ -27,8 +27,7 @@ from typing import Callable
 import numpy as np
 
 from radar_simulation import ChirpConfiguration
-from radar_simulation import MIMOConfiguration
-from sensor import ULA
+from sensor import MIMOVirtualArray
 
 class RangeDopplerFFT:
     def __init__(self):
@@ -78,44 +77,19 @@ class RangeDopplerFFT:
         return rfft
 
 class BeamFormingDOA:
-    def __init__(self, mc:MIMOConfiguration):
-        self.is_supported_array = False
-        self.array_dimension = 0
-        self.angle_fft_size = 256
+    def __init__(self, mva:MIMOVirtualArray, angle_fft_size: int = 256):
+        self.angle_fft_size = angle_fft_size
+        self.array_dimension = mva.get_array_dimension()
+        self.angle_bins = mva.get_fft_angle_bins(self.angle_fft_size)
 
-        va_arr = np.array(mc.va)
-        has_axis = np.any(va_arr[0], axis=0)
-        if (has_axis[0]) and (not has_axis[1]) and (not has_axis[2]):
-            print('the array seems ULA')
-            self.is_supported_array = True
-            self.array_dimension = 1
-        elif (has_axis[0]) and (not has_axis[1]) and (has_axis[2]):
-            print('the array seems xz-2D array')
-            self.is_supported_array = False
-            self.array_dimension = 2
-        else:
-            print('the array is not supported')
-            self.is_supported_array = False
-            self.array_dimension = 0
-
-    def get_angle_bins(self, d: float) -> np.array:
-        if not self.is_supported_array:
-            return None
-        if self.array_dimension == 1:
-            ret = ULA.get_angle_bins(d, self.angle_fft_size)
-        elif self.array_dimension == 2:
-            ret = None # not implemented yet
-        else:
-            ret = None
-        return ret
+    def get_angle_bins(self) -> np.array:
+        return self.angle_bins
 
     def get_angle_fft(self, X: np.array) -> np.array:
-        if not self.is_supported_array:
-            return None
         if self.array_dimension == 1:
             ret = np.fft.fftshift(np.fft.fft(X, n=self.angle_fft_size, axis=-1), axes=-1)
         elif self.array_dimension == 2:
-            ret = np.fft.fftshift(np.fft.fft2(X, n=(self.angle_fft_size, self.angle_fft_size), axis=(-1, -2)), axes=(-1, -2))
+            ret = np.fft.fftshift(np.fft.fft2(X, s=(self.angle_fft_size, self.angle_fft_size), axes=(-2, -1)), axes=(-2, -1))
         else:
             ret = None
         return ret
