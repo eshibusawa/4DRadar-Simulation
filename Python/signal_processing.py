@@ -89,7 +89,7 @@ class BeamFormingDOA:
         if self.array_dimension == 1:
             ret = np.fft.fftshift(np.fft.fft(X, n=self.angle_fft_size, axis=-1), axes=-1)
         elif self.array_dimension == 2:
-            ret = np.fft.fftshift(np.fft.fft2(X, s=(self.angle_fft_size, self.angle_fft_size), axes=(-2, -1)), axes=(-2, -1))
+            ret = np.fft.fftshift(np.fft.fft2(X, s=(self.angle_fft_size[0], self.angle_fft_size[1]), axes=(-2, -1)), axes=(-2, -1))
         else:
             ret = None
         return ret

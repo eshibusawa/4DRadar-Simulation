@@ -97,12 +97,15 @@ class URA:
         return C_dB, angle_bins
 
     @staticmethod
-    def get_angle_bins(d: float, fft_size: int = 256) -> np.array:
-        radrange = np.arange(-np.pi, np.pi, 2 * np.pi / fft_size)
-        ret_el = np.arcsin(radrange / 2 / np.pi / d)
-        val_az = radrange[None,:] / 2 / np.pi / d / np.cos(ret_el[:,None])
+    def get_angle_bins(d: float, fft_size: tuple[int, int] = (256, 256)) -> np.array:
+        radrange_el = np.arange(-np.pi, np.pi, 2 * np.pi / fft_size[0])
+        ret_el = np.arcsin(radrange_el / 2 / np.pi / d)
+        radrange_az = radrange_el
+        if (fft_size[0] != fft_size[1]):
+            radrange_az = np.arange(-np.pi, np.pi, 2 * np.pi / fft_size[1])
+        val_az = radrange_az[None,:] / 2 / np.pi / d / np.cos(ret_el[:,None])
         mask = np.abs(val_az) <= 1
-        ret_az = np.full((fft_size, fft_size), np.pi, dtype=radrange.dtype) # np.pi is invalid value
+        ret_az = np.full((fft_size[0], fft_size[1]), np.pi, dtype=radrange_el.dtype) # np.pi is invalid value
         ret_az[mask] = np.arcsin(val_az[mask])
         return ret_el, ret_az
 
@@ -141,7 +144,7 @@ class MIMOVirtualArray:
                 z = va_arr[k][l][2]
                 if self.va_mask[z, x] == 0:
                     self.va_mask[z, x] = 1
-                    index_vec.append(k * va_arr.shape[1] + l)
+                    index_vec.append(z * self.va_mask.shape[1] + x)
                     index_mat[0].append(z)
                     index_mat[1].append(x)
                 if z != 0:
@@ -191,13 +194,13 @@ class MIMOVirtualArray:
     def get_steering_vector(self, theta) -> np.array:
         ret = self.steering_vector_func(theta)
         if not self.is_uniform:
-            ret = ret[self.index_vec, :]
+            ret = ret[self.index_vec]
         return ret
 
     def get_steering_vector_matrix(self, theta) -> np.array:
         ret = self.steering_vector_matrix_func(theta)
         if not self.is_uniform:
-            ret = ret[self.index_vec, :]
+            ret = ret[self.index_vec]
         return ret
 
     def get_signal(self, X: np.array) -> np.array:
@@ -205,8 +208,7 @@ class MIMOVirtualArray:
             vec_X = np.reshape(X, -1)
         else:
             vec_X = np.reshape(X, (-1, *X.shape[2:]))
-        ret = vec_X[self.index_vec]
-        ret = np.squeeze(ret)
+        ret = np.squeeze(vec_X)
         return ret
 
     def get_signal_padded(self, X: np.array) -> np.array:
@@ -216,6 +218,6 @@ class MIMOVirtualArray:
         else:
             ret = np.zeros((*self.va_mask.shape, *X.shape[2:]), dtype=X.dtype)
             vec_X = np.reshape(X, (-1, *X.shape[2:]))
-        ret[self.index_mat[0], self.index_mat[1]] = vec_X[self.index_vec]
+        ret[self.index_mat[0], self.index_mat[1]] = vec_X
         ret = np.squeeze(ret)
         return ret
