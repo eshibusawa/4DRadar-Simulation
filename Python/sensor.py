@@ -117,6 +117,13 @@ class URA:
     def get_valid_angle_mask(angle_bins) -> np.array:
         return np.abs(angle_bins) <= (np.pi / 2)
 
+    @staticmethod
+    def get_valid_angle_mask_theta_phi(theta_phi: tuple[np.array, np.array]) -> np.array:
+        cos_theta = np.cos(theta_phi[0])
+        sin_phi = np.sin(theta_phi[1])
+        angle_bins = sin_phi[None, :] / cos_theta[:,None]
+        return np.abs(angle_bins) <= 1
+
 class MIMOVirtualArray:
     def __init__(self, mc: MIMOConfiguration):
         # (0) setup
@@ -163,6 +170,7 @@ class MIMOVirtualArray:
             self.angle_bins_func = lambda angle_fft_size: self.la.get_angle_bins(mc.d, angle_fft_size)
             self.steering_vector_func = lambda theta: self.la.get_steering_vector(theta)
             self.steering_vector_matrix_func = lambda theta: self.la.get_steering_vector_matrix(theta)
+            self.steering_vector_matrix_mask_theta_phi_func = None
         else:
             type_str = 'xz uniform rectangular' if self.is_uniform else 'general xz planaer'
             print('the array seems {} array'.format(type_str))
@@ -172,6 +180,7 @@ class MIMOVirtualArray:
             self.steering_vector_func = lambda theta: self.pa.get_steering_vector(theta)
             self.steering_vector_matrix_func = lambda theta: self.pa.get_steering_vector_matrix(theta)
             self.valid_angle_mask_func = lambda theta: self.pa.get_valid_angle_mask(theta)
+            self.steering_vector_matrix_mask_theta_phi_func = lambda theta: self.pa.get_valid_angle_mask_theta_phi(theta)
 
     @staticmethod
     def get_full_index(sz):
@@ -201,6 +210,9 @@ class MIMOVirtualArray:
         ret = self.steering_vector_matrix_func(theta)
         if not self.is_uniform:
             ret = ret[self.index_vec]
+        if self.steering_vector_matrix_mask_theta_phi_func is not None:
+            mask = self.steering_vector_matrix_mask_theta_phi_func(theta)
+            ret = ret[:,np.reshape(mask, -1)], mask
         return ret
 
     def get_signal(self, X: np.array) -> np.array:
