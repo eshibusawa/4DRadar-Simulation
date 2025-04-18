@@ -7,3 +7,12 @@
 
 This notebook evaluates beam pattern of uniform linear array (ULA).
 see more detail for [01_beam_pattern](./Python/01_beam_pattern.ipynb).
+
+## DoA of ULA
+<img src="images/02_range_doppler_map.png" height="200">
+<img src="images/02_range_azimuth_map_bf.png" height="200">
+<img src="images/02_range_azimuth_map_MUSIC.png" height="200">
+
+This notebook demonstrates DoA method of uniform linear array (ULA).
+The FMCW-MIMO radar considered here operates in the 77 GHz frequency band.
+see more detail for [02_8ula_single_object](Python/02_8ula_single_object.ipynb).
