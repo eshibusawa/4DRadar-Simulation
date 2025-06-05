@@ -2,6 +2,13 @@
 ***4DRadar-Simulation*** is Python implementation for synthesizing IF signals of FMCW MIMO Radar
 (Frequency-Modulated-Continuous-Wave Multiple-Input-Multiple-Output Radar).
 
+## Before you begin:
+Before working through the notebooks, we recommend reviewing the following supplemental material if you are new to the theoretical background of Direction of Arrival (DoA) estimation for Uniform Linear Arrays (ULA):
+* [Supplement: Theoretical Background of Direction of Arrival (DoA) Methods for ULA](./00_theoretical_background_of_doa.md)
+  (Provides the fundamental theoretical derivations for common DoA methods, including Delay-and-Sum Beamforming (DSBF), FFT Beamforming (FFT-BF), and the high-resolution MUSIC algorithm, offering essential context for understanding how radar systems estimate the angles of incoming signals.)
+
+This supplement is intended to provide foundational background, helping you understand the structure and objectives of each notebook more effectively.
+
 ## Beam pattern of ULA
 <img src="./images/01_coordinate_system_of_ULA.svg" width="300" style="background-color: white;">
 
