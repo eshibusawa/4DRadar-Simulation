@@ -4,7 +4,7 @@
 
 ## Before you begin:
 Before working through the notebooks, we recommend reviewing the following supplemental material if you are new to the theoretical background of Direction of Arrival (DoA) estimation for Uniform Linear Arrays (ULA):
-* [Supplement: Theoretical Background of Direction of Arrival (DoA) Methods for ULA](./00_theoretical_background_of_doa.md)
+* [Supplement: Theoretical Background of Direction of Arrival (DoA) Methods for ULA](./Python/00_theoretical_background_of_doa.ipynb)
   (Provides the fundamental theoretical derivations for common DoA methods, including Delay-and-Sum Beamforming (DSBF), FFT Beamforming (FFT-BF), and the high-resolution MUSIC algorithm, offering essential context for understanding how radar systems estimate the angles of incoming signals.)
 
 This supplement is intended to provide foundational background, helping you understand the structure and objectives of each notebook more effectively.
