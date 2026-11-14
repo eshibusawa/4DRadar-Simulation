@@ -1,0 +1,37 @@
+# 4dradar-simulation + build dependencies for openEMS (C++ solver and Python bindings).
+# openEMS is not on conda-forge/PyPI, so it is built from source into this environment.
+# See ../tools/setup_openems.sh (creates this environment and builds openEMS into it)
+name: 4dradar-openems
+channels:
+  - conda-forge
+dependencies:
+  - ipython
+  - ipywidgets
+  - jupyter
+  - matplotlib
+  - nbconvert
+  - pip
+  - python=3.12.*
+  - scipy
+  - h5py
+  # build toolchain
+  - c-compiler
+  - cxx-compiler
+  - cmake
+  - make
+  - pkg-config
+  - git
+  # openEMS / CSXCAD dependencies
+  - libboost-devel
+  - hdf5
+  - cgal-cpp
+  - tinyxml
+  - vtk
+  - cython
+  - setuptools
+  - wheel
+  # reading the Gerber files of the board (openems/gerber_geometry.py, rx_from_gerber.py)
+  - shapely
+  - pip:
+      - gerbonara
+prefix: /path/to/your/envs/4dradar-openems

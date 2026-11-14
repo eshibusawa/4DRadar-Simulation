@@ -32,3 +32,11 @@ see more detail for [02_8ula_single_object](Python/02_8ula_single_object.ipynb).
 This notebook demonstrates DoA method of uniform rectangular array (URA).
 The FMCW-MIMO radar considered here is same as ULA simulation.
 see more detail for [03_16ura_single_object](Python/03_16ura_single_object.ipynb).
+
+## Radiation pattern of the patch antenna element
+<img src="images/05_patch_antenna4_polar.png" height="200" style="background-color: white;">
+<img src="images/05_patch_antenna_board_d_rx1_rx2_model.png" height="200" style="background-color: white;">
+<img src="images/05_patch_antenna_board_eplane.png" height="200" style="background-color: white;">
+
+This notebook computes the pattern of the patch antenna element of the TI cascade radar evaluation module (MMWCAS-RF-EVM) with the FDTD solver [openEMS](https://docs.openems.de): a 4-patch series-fed element, and the same element read from the Gerber files of the board, compared with the TI document.
+see more detail for [05_patch_element_pattern](Python/05_patch_element_pattern.ipynb).
